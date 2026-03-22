@@ -1,0 +1,11 @@
+data/*.h5
+data/*.csv
+models/*.h5
+__pycache__/
+.pytest_cache
+.ipynb_checkpoints/
+.vscode
+*.pyc
+chroma_db/*
+data/*
+outputs/*
