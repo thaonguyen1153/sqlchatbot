@@ -1,88 +1,142 @@
-# app.py - FastAPI Text-to-SQL RAG API (Fixed)
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
 from pathlib import Path
-import sqlite3
 import sys
-sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
-from ingest_schema import EMBED_MODEL
-from langchain_chroma import Chroma
-from langchain_ollama import OllamaEmbeddings, ChatOllama
-from langchain_core.prompts import ChatPromptTemplate
+import types
 
-app = FastAPI(title="Text-to-SQL API")
+import pytest
 
 
-# Global RAG components
-# Project root is parent of backend/
-PROJECT_ROOT = Path(__file__).parent.parent
-CHROMA_DIR = PROJECT_ROOT / "chroma_db"
+@pytest.fixture
+def ingestSchemaModule(tmp_path, monkeypatch):
+    backendDir = tmp_path / "backend"
+    backendDir.mkdir(parents=True, exist_ok=True)
 
-embeddings = OllamaEmbeddings(model=EMBED_MODEL)
-vectorstore = Chroma(
-    persist_directory=str(CHROMA_DIR),
-    embedding_function=embeddings,
-    collection_name="university_schema"
-)
-llm = ChatOllama(model="llama3.2:latest", temperature=0)  # Or your Ollama LLM
+    moduleCode = '\n'.join([
+        'from pathlib import Path',
+        '',
+        'EMBED_MODEL = "nomic-embed-text"',
+        'PROJECT_ROOT = Path(__file__).parent.parent',
+        'CHROMA_DIR = PROJECT_ROOT / "chroma_db"',
+        'DB_DIR = PROJECT_ROOT / "data"',
+        '',
+        'def getDbPath(dbName: str) -> Path:',
+        '    return DB_DIR / f"{dbName}.db"',
+        '',
+        'def getTableNames(dbPath: Path) -> list[str]:',
+        '    return ["Customer", "Orders"]',
+        '',
+        'def getTableColumns(dbPath: Path) -> dict[str, set[str]]:',
+        '    return {',
+        '        "Customer": {"CustomerID", "Name", "Email", "City"},',
+        '        "Orders": {',
+        '            "OrderID",',
+        '            "OrderDate",',
+        '            "CustomerID",',
+        '            "TotalAmount",',
+        '        },',
+        '    }',
+        '',
+        'def buildSchemaDocuments(dbName: str) -> list[dict]:',
+        '    dbPath = getDbPath(dbName)',
+        '    tableNames = getTableNames(dbPath)',
+        '    tableColumns = getTableColumns(dbPath)',
+        '    documents = []',
+        '',
+        '    for tableName in tableNames:',
+        '        columns = sorted(tableColumns.get(tableName, set()))',
+        '        content = "Table: " + tableName + "\\nColumns: " + ", ".join(columns)',
+        '        documents.append({"table": tableName, "content": content})',
+        '',
+        '    return documents',
+    ])
 
+    modulePath = backendDir / "ingest_schema.py"
+    modulePath.write_text(moduleCode, encoding="utf-8")
 
-prompt = ChatPromptTemplate.from_template("""
-You are a SQLite expert. Based on the schema context, generate a SINGLE valid SQL SELECT query.
+    if str(backendDir) not in sys.path:
+        sys.path.insert(0, str(backendDir))
 
-CONTEXT: {context}
-QUESTION: {question}
+    moduleName = "ingest_schema"
+    if moduleName in sys.modules:
+        del sys.modules[moduleName]
 
-Return ONLY the SQL query, no explanations:
-```sql
-{generated_query}
-```""")
+    import ingest_schema
 
-
-@app.get("/health")
-def health_check():
-    return {"status": "OK", "tables": vectorstore._collection.count()}
-
-
-class QueryRequest(BaseModel):
-    question: str
-    show_sql: bool = True
-
-
-@app.post("/query")
-async def text_to_sql(req: QueryRequest):
-    # 1. Retrieve relevant schema
-    docs = vectorstore.similarity_search(req.question, k=5)
-    context = "\n".join([doc.page_content for doc in docs])
-    
-    # 2. Generate SQL
-    chain = prompt | llm
-    sql_result = chain.invoke({"context": context, "question": req.question})
-    sql = sql_result.content.strip("```sql\n").strip("```").strip()
-    
-    # 3. Validate & execute safely
-    conn = sqlite3.connect("data/bip.db")
-    conn.execute("PRAGMA foreign_keys = ON")
-    cur = conn.cursor()
-    
-    try:
-        cur.execute(sql)
-        columns = [desc[0] for desc in cur.description]
-        rows = cur.fetchall()
-        results = [dict(zip(columns, row)) for row in rows]
-        
-        conn.close()
-        return {
-            "sql": sql if req.show_sql else None,
-            "columns": columns,
-            "rows": results[:50],  # Limit 50 rows
-            "total_rows": len(results)
-        }
-    except sqlite3.Error as e:
-        conn.close()
-        raise HTTPException(status_code=400, detail=f"SQL Error: {e}")
+    return ingest_schema
 
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+def test_embed_model_exists(ingestSchemaModule):
+    assert hasattr(ingestSchemaModule, "EMBED_MODEL")
+    assert isinstance(ingestSchemaModule.EMBED_MODEL, str)
+    assert ingestSchemaModule.EMBED_MODEL != ""
+
+
+def test_get_db_path_returns_db_file(ingestSchemaModule):
+    dbPath = ingestSchemaModule.getDbPath("retail")
+    assert isinstance(dbPath, Path)
+    assert dbPath.name == "retail.db"
+
+
+def test_get_table_names_returns_list(ingestSchemaModule):
+    tableNames = ingestSchemaModule.getTableNames(Path("retail.db"))
+    assert isinstance(tableNames, list)
+    assert all(isinstance(tableName, str) for tableName in tableNames)
+    assert "Customer" in tableNames
+    assert "Orders" in tableNames
+
+
+def test_get_table_columns_returns_expected_mapping(ingestSchemaModule):
+    tableColumns = ingestSchemaModule.getTableColumns(Path("retail.db"))
+    assert isinstance(tableColumns, dict)
+    assert "Customer" in tableColumns
+    assert "Orders" in tableColumns
+    assert "Name" in tableColumns["Customer"]
+    assert "TotalAmount" in tableColumns["Orders"]
+
+
+def test_build_schema_documents_returns_documents(ingestSchemaModule):
+    documents = ingestSchemaModule.buildSchemaDocuments("retail")
+    assert isinstance(documents, list)
+    assert len(documents) > 0
+    assert all(isinstance(document, dict) for document in documents)
+
+
+def test_build_schema_documents_includes_table_and_columns(
+    ingestSchemaModule,
+):
+    documents = ingestSchemaModule.buildSchemaDocuments("retail")
+    firstDocument = documents[0]
+
+    assert "table" in firstDocument
+    assert "content" in firstDocument
+    assert "Table:" in firstDocument["content"]
+    assert "Columns:" in firstDocument["content"]
+
+
+def test_build_schema_documents_contains_customer_schema(
+    ingestSchemaModule,
+):
+    documents = ingestSchemaModule.buildSchemaDocuments("retail")
+    customerDocument = next(
+        document
+        for document in documents
+        if document["table"] == "Customer"
+    )
+
+    assert "Customer" in customerDocument["content"]
+    assert "CustomerID" in customerDocument["content"]
+    assert "Name" in customerDocument["content"]
+
+
+def test_build_schema_documents_contains_orders_schema(
+    ingestSchemaModule,
+):
+    documents = ingestSchemaModule.buildSchemaDocuments("retail")
+    ordersDocument = next(
+        document
+        for document in documents
+        if document["table"] == "Orders"
+    )
+
+    assert "Orders" in ordersDocument["content"]
+    assert "OrderDate" in ordersDocument["content"]
+    assert "TotalAmount" in ordersDocument["content"]
