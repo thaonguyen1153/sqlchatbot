@@ -97,5 +97,4 @@ pytest test_*.py --html=outputs/test_report.html --self-contained-html -v
 ## Next step: Deployment/Phase 3
 
 Dockerize, ML eval (NLQ accuracy), dashboard metrics.
-
 Author: Thao Nguyen | CST2213 26W | Mar 2026

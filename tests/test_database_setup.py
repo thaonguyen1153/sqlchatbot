@@ -1,118 +1,237 @@
 import sys
-import pytest
-from pathlib import Path
 import sqlite3
 import tempfile
+import pytest
+from pathlib import Path
 
-# Fix path to backend
 sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
-from database_setup import ensure_dirs, run_ddl_scripts
+from database_setup import ensure_dirs, run_ddl_scripts, list_tables, SCRIPTS_DIR
+
+# ─── Schema under test ────────────────────────────────────────────────────────
+# Maps each expected SQL script to the tables it should produce,
+# plus the expected column count per table and its primary/foreign keys.
+
+EXPECTED_SCHEMA = {
+    "01_university_schema.sql": {
+        "Students": {
+            "columns": 5,  # StudentID, FirstName, LastName, Age, Major
+            "primary_key": ["StudentID"],
+            "foreign_keys": [],
+        },
+        "Courses": {
+            "columns": 3,  # CourseID, CourseName, Credits
+            "primary_key": ["CourseID"],
+            "foreign_keys": [],
+        },
+        "Enrollments": {
+            "columns": 4,  # EnrollmentID, StudentID, CourseID, Grade
+            "primary_key": ["EnrollmentID"],
+            "foreign_keys": ["StudentID", "CourseID"],
+        },
+    },
+    "02_retail_schema.sql": {
+        "Customer": {
+            "columns": 4,  
+            "primary_key": ["CustomerID"],
+            "foreign_keys": [],
+        },
+        "Product": {
+            "columns": 4,
+            "primary_key": ["ProductID"],
+            "foreign_keys": [],
+        },
+        "Orders": {
+            "columns": 4,  # OrderID, OrderDate, CustomerID, TotalAmount
+            "primary_key": ["OrderID"],
+            "foreign_keys": ["CustomerID"],
+        },
+        "OrderDetails": {
+            "columns": 4,
+            "primary_key": ["OrderDetailID"],
+            "foreign_keys": ["OrderID", "ProductID"],
+        },
+    },
+}
+
+# ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def getTableInfo(conn: sqlite3.Connection, tableName: str) -> list[dict]:
+    cursor = conn.cursor()
+    cursor.execute(f"PRAGMA table_info({tableName})")
+    return cursor.fetchall()
+
+
+def getForeignKeys(conn: sqlite3.Connection, tableName: str) -> list[dict]:
+    cursor = conn.cursor()
+    cursor.execute(f"PRAGMA foreign_key_list({tableName})")
+    return cursor.fetchall()
+
+
+def getPrimaryKeys(conn: sqlite3.Connection, tableName: str) -> list[str]:
+    info = getTableInfo(conn, tableName)
+    # table_info row: (cid, name, type, notnull, dflt_value, pk)
+    return [row[1] for row in info if row[5] > 0]
+
+
+# ─── Fixtures ─────────────────────────────────────────────────────────────────
 
 @pytest.fixture
-def temp_db_path():
-    """Temp DB for isolated testing."""
+def tempDbPath():
     with tempfile.TemporaryDirectory() as tmpdir:
-        db_path = Path(tmpdir) / "test_bip.db"
-        yield db_path
+        yield Path(tmpdir) / "test_bip.db"
 
-def test_ensure_dirs_creates_folders(tmp_path):
-    from database_setup import SCRIPTS_DIR
+
+@pytest.fixture
+def populatedDb(tempDbPath, tmp_path):
+    """DB loaded with all expected SQL scripts."""
+    scriptsDir = tmp_path / "db" / "scripts"
+    scriptsDir.mkdir(parents=True)
+
+    for scriptName in EXPECTED_SCHEMA:
+        realScript = Path("db/scripts") / scriptName
+        if realScript.exists():
+            (scriptsDir / scriptName).write_text(realScript.read_text())
+
+    run_ddl_scripts(tempDbPath, scriptsDir, overwrite=True)
+    yield tempDbPath, scriptsDir
+
+
+# ─── Directory tests ──────────────────────────────────────────────────────────
+
+def test_ensure_dirs_creates_data_folder():
     ensure_dirs()
     assert Path("data").exists()
+
+
+def test_ensure_dirs_creates_scripts_folder():
+    ensure_dirs()
     assert SCRIPTS_DIR.exists()
 
-def test_run_ddl_scripts_creates_db_and_tables(temp_db_path, tmp_path):
-    """Test DDL with fixed syntax."""
-    # Create valid test script
-    scripts_dir = tmp_path / "db" / "scripts"
-    scripts_dir.mkdir(parents=True)
-    
-    script_content = """
-    CREATE TABLE IF NOT EXISTS test_customers (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL
-    );
-    
-    CREATE TABLE IF NOT EXISTS test_orders (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        customer_id INTEGER,
-        FOREIGN KEY(customer_id) REFERENCES test_customers(id)
-    );
-    """
-    
-    script_path = scripts_dir / "01_test_tables.sql"
-    script_path.write_text(script_content)
-    
-    run_ddl_scripts(temp_db_path, scripts_dir)
-    
-    # Verify DB and tables
-    assert temp_db_path.exists()
-    conn = sqlite3.connect(temp_db_path)
-    cur = conn.cursor()
-    cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
-    tables = {row[0] for row in cur.fetchall()}
-    conn.close()
-    
-    assert "test_customers" in tables
-    assert "test_orders" in tables
 
-def test_database_contains_expected_tables(temp_db_path, tmp_path):
-    """Verify schema creates expected tables with correct structure."""
-    scripts_dir = tmp_path / "db" / "scripts"
-    scripts_dir.mkdir(parents=True)
-    
-    # Use your university schema
-    schema_sql = Path("db/scripts/01_university_schema.sql").read_text()
-    (scripts_dir / "01_university_schema.sql").write_text(schema_sql)
-    
-    run_ddl_scripts(temp_db_path, scripts_dir)
-    
-    conn = sqlite3.connect(temp_db_path)
-    cur = conn.cursor()
-    
-    # Check tables exist
-    cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
-    tables = {row[0] for row in cur.fetchall()}
-    expected_tables = {'Students', 'Courses', 'Enrollments'}
-    assert expected_tables.issubset(tables)
-    
-    # Verify sample data
-    cur.execute("SELECT COUNT(*) FROM Students;")
-    assert cur.fetchone()[0] >= 3  # At least 3 students
-    
-    cur.execute("SELECT COUNT(*) FROM Enrollments;")
-    assert cur.fetchone()[0] == 4  # Exactly 4 enrollments
-    
-    conn.close()
-    print("✓ Schema and data verified")
+# ─── Script-count test ────────────────────────────────────────────────────────
 
-def test_real_schema_loaded():
-    """Verify ACTUAL project DB has correct university tables."""
-    from database_setup import DB_PATH, list_tables
-    
-    # Run setup first (safe overwrite for test)
-    ensure_dirs()
-    run_ddl_scripts(DB_PATH, Path("db/scripts"), overwrite=True)
-    
-    tables = list_tables()
-    expected = {"Students", "Courses", "Enrollments"}
-    
-    assert expected.issubset(tables), f"Missing tables. Got: {tables}"
-    
-    # Verify data exists
-    conn = sqlite3.connect(DB_PATH)
-    conn.execute("BEGIN IMMEDIATE")  # Exclusive lock for test
-    cur = conn.cursor()
-    
-    cur.execute("SELECT COUNT(*) FROM Students")
-    students = cur.fetchone()[0]
-    cur.execute("SELECT COUNT(*) FROM Enrollments") 
-    enrolls = cur.fetchone()[0]
-    
-    conn.rollback()  # Don't commit test changes
-    conn.close()
-    
-    assert students >= 3
-    assert enrolls == 4
-    print(f"✓ Real DB verified: {students} students, {enrolls} enrollments")
+def test_scripts_dir_has_expected_script_count(populatedDb):
+    _, scriptsDir = populatedDb
+    sqlFiles = list(scriptsDir.glob("*.sql"))
+    assert len(sqlFiles) == len(EXPECTED_SCHEMA), (
+        f"Expected {len(EXPECTED_SCHEMA)} scripts, found {len(sqlFiles)}: "
+        f"{[f.name for f in sqlFiles]}"
+    )
 
+
+# ─── Per-script: table existence ──────────────────────────────────────────────
+
+@pytest.mark.parametrize("scriptName,tables", [
+    (script, list(schema.keys()))
+    for script, schema in EXPECTED_SCHEMA.items()
+])
+def test_script_creates_expected_tables(populatedDb, scriptName, tables):
+    dbPath, _ = populatedDb
+    conn = sqlite3.connect(dbPath)
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+    )
+    existing = {row[0] for row in cursor.fetchall()}
+    conn.close()
+
+    for table in tables:
+        assert table in existing, (
+            f"Script '{scriptName}' should create table '{table}'"
+        )
+
+
+# ─── Per-table: column count ──────────────────────────────────────────────────
+
+@pytest.mark.parametrize("tableName,meta", [
+    (table, meta)
+    for schema in EXPECTED_SCHEMA.values()
+    for table, meta in schema.items()
+])
+def test_table_has_expected_column_count(populatedDb, tableName, meta):
+    dbPath, _ = populatedDb
+    conn = sqlite3.connect(dbPath)
+    columns = getTableInfo(conn, tableName)
+    conn.close()
+
+    assert len(columns) == meta["columns"], (
+        f"Table '{tableName}': expected {meta['columns']} columns, "
+        f"got {len(columns)}"
+    )
+
+
+# ─── Per-table: primary key ───────────────────────────────────────────────────
+
+@pytest.mark.parametrize("tableName,meta", [
+    (table, meta)
+    for schema in EXPECTED_SCHEMA.values()
+    for table, meta in schema.items()
+])
+def test_table_has_correct_primary_key(populatedDb, tableName, meta):
+    dbPath, _ = populatedDb
+    conn = sqlite3.connect(dbPath)
+    primaryKeys = getPrimaryKeys(conn, tableName)
+    conn.close()
+
+    assert sorted(primaryKeys) == sorted(meta["primary_key"]), (
+        f"Table '{tableName}': expected PK {meta['primary_key']}, "
+        f"got {primaryKeys}"
+    )
+
+
+# ─── Per-table: foreign key columns ──────────────────────────────────────────
+
+@pytest.mark.parametrize("tableName,meta", [
+    (table, meta)
+    for schema in EXPECTED_SCHEMA.values()
+    for table, meta in schema.items()
+    if meta["foreign_keys"]
+])
+def test_table_has_correct_foreign_keys(populatedDb, tableName, meta):
+    dbPath, _ = populatedDb
+    conn = sqlite3.connect(dbPath)
+    fkRows = getForeignKeys(conn, tableName)
+    conn.close()
+
+    # foreign_key_list row: (id, seq, table, from, to, ...)
+    fkColumns = [row[3] for row in fkRows]
+    for expectedFk in meta["foreign_keys"]:
+        assert expectedFk in fkColumns, (
+            f"Table '{tableName}': expected FK on '{expectedFk}', "
+            f"got FK columns {fkColumns}"
+        )
+
+
+# ─── Idempotency ──────────────────────────────────────────────────────────────
+
+def test_run_ddl_scripts_skips_existing_db(tempDbPath, tmp_path):
+    """Calling run_ddl_scripts twice without overwrite must not raise."""
+    scriptsDir = tmp_path / "scripts"
+    scriptsDir.mkdir()
+    (scriptsDir / "01_noop.sql").write_text(
+        "CREATE TABLE IF NOT EXISTS Noop (id INTEGER PRIMARY KEY);"
+    )
+    run_ddl_scripts(tempDbPath, scriptsDir, overwrite=True)
+    run_ddl_scripts(tempDbPath, scriptsDir, overwrite=False)  # must not crash
+
+
+# ─── list_tables ─────────────────────────────────────────────────────────────
+
+def test_list_tables_returns_list_of_strings(populatedDb):
+    dbPath, _ = populatedDb
+    tables = list_tables(dbPath)
+    assert isinstance(tables, list)
+    assert all(isinstance(t, str) for t in tables)
+
+
+def test_list_tables_matches_created_tables(populatedDb):
+    dbPath, _ = populatedDb
+    tables = set(list_tables(dbPath))
+    expected = {
+        table
+        for schema in EXPECTED_SCHEMA.values()
+        for table in schema
+    }
+    assert expected.issubset(tables), (
+        f"Missing from list_tables: {expected - tables}"
+    )

@@ -10,7 +10,7 @@ from langchain_chroma import Chroma
 from langchain_ollama import OllamaEmbeddings, ChatOllama
 from langchain_core.prompts import ChatPromptTemplate
 
-app = FastAPI(title="University Text-to-SQL API")
+app = FastAPI(title="Text-to-SQL API")
 
 
 # Global RAG components

@@ -3,130 +3,158 @@
 # Stores database in data/ directory and scripts in db/scripts/.
 
 import sqlite3
-import os
 from pathlib import Path
 
-# Constants
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()
-DB_PATH = PROJECT_ROOT / "data" / "bip.db"
 DB_DIR = PROJECT_ROOT / "data"
 SCRIPTS_DIR = PROJECT_ROOT / "db" / "scripts"
-CHROMA_DIR = PROJECT_ROOT / "chroma_db"
+DEFAULT_DB_NAME = "bip"
 SCRIPT_EXT = ".sql"
 
-def ensure_dirs():
+
+def ensureDirs() -> None:
     """Create required directories."""
     DB_DIR.mkdir(exist_ok=True)
     SCRIPTS_DIR.mkdir(parents=True, exist_ok=True)
 
-def run_ddl_scripts(db_path: Path, scripts_dir: Path, overwrite: bool = False):
-    """Safe DDL execution."""
-    if db_path.exists() and not overwrite:
-        print(f"DB exists, skipping. Use overwrite=True to reset.")
+
+def getDbPath(dbName: str = DEFAULT_DB_NAME) -> Path:
+    """Build SQLite database path from database name."""
+    return DB_DIR / f"{dbName}.db"
+
+
+def runDdlScripts(
+    dbName: str = DEFAULT_DB_NAME,
+    scriptsDir: Path = SCRIPTS_DIR,
+    overwrite: bool = False,
+) -> None:
+    """Run all DDL scripts against one SQLite database."""
+    dbPath = getDbPath(dbName)
+
+    if dbPath.exists() and not overwrite:
+        print(f"DB exists, skipping: {dbPath}")
+        print("Use overwrite=True to reset.")
         return
-    
-    conn = sqlite3.connect(db_path)
-    conn.execute("PRAGMA foreign_keys = ON")  # Enforce FKs
-    
-    script_files = sorted(scripts_dir.glob("*.sql"))
-    if not script_files:
-        print("No .sql files in", scripts_dir)
-        conn.close()
+
+    if overwrite and dbPath.exists():
+        dbPath.unlink()
+
+    scriptFiles = sorted(scriptsDir.glob(f"*{SCRIPT_EXT}"))
+    if not scriptFiles:
+        print("No .sql files in", scriptsDir)
         return
-    
-    for script_file in script_files:
-        print(f"Running {script_file.name}...")
-        try:
-            with open(script_file, 'r') as f:
-                sql = f.read()
-            conn.executescript(sql)
-            print(f"✓ {script_file.name}")
-        except Exception as e:
-            print(f"✗ {script_file.name}: {e}")
-            conn.rollback()
-    
-    conn.commit()
-    conn.close()
-    print(f"Database ready: {db_path}")
 
+    conn = sqlite3.connect(dbPath)
+    conn.execute("PRAGMA foreign_keys = ON")
 
-
-def run_specific_script(script_name: str):
-    """Run one specific script file."""
-    script_path = SCRIPTS_DIR / script_name
-    if not script_path.exists():
-        print(f"Script not found: {script_path}")
-        return
-    
-    ensure_dirs()
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-    
-    print(f"Running {script_name}...")
-    with open(script_path, "r") as f:
-        sql = f.read()
-    cur.executescript(sql)
-    
-    conn.commit()
-    conn.close()
-    print(f"✓ {script_name} executed on {DB_PATH}")
-
-# Usage: run_specific_script("01_university_schema.sql")
-
-def list_tables(db_path: Path = None):
-    """List all tables. Auto-creates DB if missing."""
-    if db_path is None:
-        db_path = DB_PATH
-    
-    # Ensure DB exists
-    if not db_path.exists():
-        print("⚠️ No DB found. Running setup...")
-        ensure_dirs()
-        run_ddl_scripts(db_path, SCRIPTS_DIR, overwrite=False)
-    
     try:
-        conn = sqlite3.connect(db_path)
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT name FROM sqlite_master 
-            WHERE type='table' AND name NOT LIKE 'sqlite_%'
-        """)
-        tables = [row[0] for row in cur.fetchall()]
+        for scriptFile in scriptFiles:
+            print(f"Running {scriptFile.name} on {dbPath.name}...")
+            with open(scriptFile, "r", encoding="utf-8") as file:
+                sql = file.read()
+            conn.executescript(sql)
+            print(f"✓ {scriptFile.name}")
+
+        conn.commit()
+        print(f"Database ready: {dbPath}")
+    except Exception as error:
+        conn.rollback()
+        print(f"✗ Setup failed: {error}")
+    finally:
         conn.close()
-        
-        if tables:
-            print(f"Tables in {db_path}: {tables}")
-            return tables
-        else:
-            print("No tables found. Run setup first.")
-            return []
-            
-    except sqlite3.Error as e:
-        print(f"DB error: {e}")
+
+
+def runSpecificScript(
+    scriptName: str,
+    dbName: str = DEFAULT_DB_NAME,
+) -> None:
+    """Run one specific script file against one SQLite database."""
+    scriptPath = SCRIPTS_DIR / scriptName
+    dbPath = getDbPath(dbName)
+
+    if not scriptPath.exists():
+        print(f"Script not found: {scriptPath}")
+        return
+
+    ensureDirs()
+    conn = sqlite3.connect(dbPath)
+    conn.execute("PRAGMA foreign_keys = ON")
+    cur = conn.cursor()
+
+    try:
+        print(f"Running {scriptName} on {dbPath.name}...")
+        with open(scriptPath, "r", encoding="utf-8") as file:
+            sql = file.read()
+        cur.executescript(sql)
+        conn.commit()
+        print(f"✓ {scriptName} executed on {dbPath}")
+    except Exception as error:
+        conn.rollback()
+        print(f"✗ {scriptName}: {error}")
+    finally:
+        conn.close()
+
+
+def listTables(dbName: str = DEFAULT_DB_NAME) -> list[str]:
+    """List all tables in one SQLite database."""
+    dbPath = getDbPath(dbName)
+
+    if not dbPath.exists():
+        print(f"⚠️ No DB found: {dbPath}")
         return []
 
-# Usage: python -c "from database_setup import list_tables; list_tables()"
+    try:
+        conn = sqlite3.connect(dbPath)
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT name FROM sqlite_master
+            WHERE type='table' AND name NOT LIKE 'sqlite_%'
+            """
+        )
+        tables = [row[0] for row in cur.fetchall()]
 
-def show_sample_data():
+        if tables:
+            print(f"Tables in {dbPath}: {tables}")
+            return tables
+
+        print("No tables found. Run setup first.")
+        return []
+    except sqlite3.Error as error:
+        print(f"DB error: {error}")
+        return []
+    finally:
+        conn.close()
+
+
+def showSampleData(dbName: str = DEFAULT_DB_NAME) -> None:
     """Show sample data from each table."""
-    tables = list_tables()
-    conn = sqlite3.connect(DB_PATH)
+    dbPath = getDbPath(dbName)
+    tables = listTables(dbName)
+
+    if not tables:
+        return
+
+    conn = sqlite3.connect(dbPath)
     cur = conn.cursor()
-    
-    for table in tables:
-        cur.execute(f"SELECT * FROM {table} LIMIT 2;")
-        rows = cur.fetchall()
-        print(f"\n{table} (first 2 rows):")
-        for row in rows:
-            print(f"  {row}")
-    
-    conn.close()
+
+    try:
+        for table in tables:
+            cur.execute(f"SELECT * FROM {table} LIMIT 2;")
+            rows = cur.fetchall()
+            print(f"\n{table} (first 2 rows):")
+            for row in rows:
+                print(f" {row}")
+    finally:
+        conn.close()
 
 
-# Update main()
-def main():
-    ensure_dirs()
-    run_ddl_scripts(DB_PATH, SCRIPTS_DIR, overwrite=True)  # Set False for safety
+def main() -> None:
+    ensureDirs()
+
+    # Example: build separate databases
+    runSpecificScript("01_university_schema.sql", dbName="university")
+    runSpecificScript("02_retail_schema.sql", dbName="retail")
 
 
 if __name__ == "__main__":
