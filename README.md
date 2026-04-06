@@ -1,6 +1,6 @@
 # Text-to-SQL RAG Chatbot
-
-**CST2213 Business Intelligence Programming - Phase 2 (Mar 2026)**  
+![BI chatbot](docs/chatbot.png)
+**CST2213 Business Intelligence Programming - Final project (April 2026)**  
 Text-to-SQL system converts natural language queries to safe SELECTs on database using RAG (Chroma + OllamaEmbeddings), FastAPI backend, Streamlit UI.
 
 [API Docs](http://localhost:8000/docs) | [Tests](outputs/test_report.html)
@@ -42,7 +42,7 @@ sqlchatbot/
 │   └── diagrams/               # ERD, layers, sequence
 │
 ├── outputs/                    # Generated test report
-│   └── test_report.html│
+│   └── test_report.html
 │
 ├── app_streamlit.py            # Streamlit application
 └── _run_all_.bat               # Start LLM, backend and frontend servers
@@ -102,7 +102,7 @@ The application evaluate base on these criterias:
 - The final answer is consistent with the SQL result.
 - The response is clear, relevant, and complete for the user’s question.
 
-Please refer to the report for set of questions used and result.
+Please refer to [the report](docs/sql-evaluation-table.html) for set of questions used and result.
 
 ---
 Author: Thao Nguyen | CST2213 26W | April 2026

@@ -1,0 +1,89 @@
+{
+  "savedAt": "2026-04-06T07:12:32.016Z",
+  "rows": [
+    [
+      "How many customers are there?",
+      "COUNT(*) from customers.",
+      "7",
+      "SELECT COUNT(DISTINCT CustomerID) FROM Orders",
+      "7",
+      "yes",
+      "yes",
+      "partial",
+      "",
+      "pass",
+      "no",
+      "May get wrong number of customer if exist customer without orders."
+    ],
+    [
+      "What is total sales for 2025?",
+      "SELECT SUM(T1.TotalAmount) \nFROM Orders AS T1 \nJOIN Customer AS T2 ON T1.CustomerID = T2.CustomerID \nWHERE YEAR(T1.OrderDate) = 2025",
+      "448.00",
+      "SELECT SUM(T1.TotalAmount) FROM Orders AS T1 JOIN Customer AS T2 ON T1.CustomerID = T2.CustomerID WHERE STRFTIME('%Y', T1.OrderDate) = '2025'",
+      "448",
+      "yes",
+      "yes",
+      "yes",
+      "",
+      "pass",
+      "no",
+      ""
+    ],
+    [
+      "Show the top 5 products by revenue.",
+      "GROUP BY product, SUM(revenue), ORDER BY revenue DESC, LIMIT 5.",
+      "Five rows sorted by revenue descending.",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "no",
+      ""
+    ],
+    [
+      "What is the average order value by region?",
+      "AVG(order_value) grouped by region.",
+      "One row per region with average order value.",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "no",
+      ""
+    ],
+    [
+      "Find orders with a status that does not exist.",
+      "Filter on a non-existing status and return zero rows.",
+      "Empty result set with a clear explanation.",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "no",
+      ""
+    ],
+    [
+      "List customers with orders above 1000.",
+      "JOIN customers and orders, filter amount greater than 1000.",
+      "Matching customers only, based on the join and filter.",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "no",
+      ""
+    ]
+  ]
+}

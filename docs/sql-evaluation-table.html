@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SQL Evaluation Table</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f7f6f2;
+      --surface: #ffffff;
+      --surfaceAlt: #f5f8f9;
+      --surfaceSoft: #edf4f5;
+      --text: #28251d;
+      --muted: #667085;
+      --border: #d8dde3;
+      --primary: #01696f;
+      --primarySoft: #d9ecec;
+      --success: #2f7d32;
+      --successSoft: #e2f2e3;
+      --warn: #b26a00;
+      --warnSoft: #fff1da;
+      --danger: #a13544;
+      --dangerSoft: #f7e3e7;
+      --shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
+      --radius: 14px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    .page {
+      max-width: 1520px;
+      margin: 0 auto;
+      padding: 28px 20px 56px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .hero {
+      padding: 28px;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: 2rem;
+      line-height: 1.15;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 1.15rem;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .badgeRow,
+    .actionRow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .badge,
+    .actionButton,
+    .fileLabel {
+      padding: 9px 13px;
+      border-radius: 999px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      border: 1px solid transparent;
+    }
+
+    .badge {
+      background: var(--primarySoft);
+      color: var(--primary);
+    }
+
+    .actionButton,
+    .fileLabel {
+      background: #fff;
+      color: var(--text);
+      border-color: var(--border);
+      cursor: pointer;
+    }
+
+    .actionButton.primary {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    .actionButton.warn {
+      background: var(--warnSoft);
+      color: var(--warn);
+      border-color: #f2d8a7;
+    }
+
+    .fileInput {
+      display: none;
+    }
+
+    .topGrid,
+    .summaryGrid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .panel {
+      padding: 22px;
+    }
+
+    .metricGrid,
+    .controlGrid {
+      display: grid;
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    .metricGrid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .controlGrid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .controlLabel,
+    .metricLabel {
+      font-size: 0.84rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 6px;
+    }
+
+    .metricCard {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surfaceSoft);
+      padding: 16px;
+    }
+
+    .metricValue {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .metricHint,
+    .small {
+      font-size: 0.92rem;
+      color: var(--muted);
+    }
+
+    .inputBox,
+    .selectBox,
+    .textareaBox {
+      width: 100%;
+      border: 1px solid #c8d2d8;
+      border-radius: 10px;
+      background: #fff;
+      color: var(--text);
+      padding: 10px 12px;
+      font: inherit;
+    }
+
+    .inputBox:focus,
+    .selectBox:focus,
+    .textareaBox:focus {
+      outline: 2px solid rgba(1, 105, 111, 0.16);
+      border-color: var(--primary);
+    }
+
+    .helpText {
+      margin-top: 8px;
+      font-size: 0.9rem;
+    }
+
+    .tableCard {
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+
+    .toolbar {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, #fcfdfd, #f6f9fa);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .tableWrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      min-width: 1640px;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #e9f1f2;
+      color: #18373a;
+      font-size: 0.84rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 14px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    tbody td {
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+      font-size: 0.95rem;
+    }
+
+    tbody tr:nth-child(odd) {
+      background: var(--surface);
+    }
+
+    tbody tr:nth-child(even) {
+      background: var(--surfaceAlt);
+    }
+
+    tbody tr:hover {
+      background: #e9f4f5;
+    }
+
+    .idCell {
+      font-weight: 700;
+      color: var(--primary);
+      white-space: nowrap;
+    }
+
+    .textareaBox {
+      min-height: 112px;
+      resize: vertical;
+    }
+
+    .sqlBox {
+      min-height: 135px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9rem;
+      background: #fcfcfc;
+    }
+
+    .shotBox {
+      min-height: 135px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      border: 2px dashed #bfd0d4;
+      border-radius: 12px;
+      background: #fbfdfd;
+      color: var(--muted);
+      padding: 12px;
+    }
+
+    .statusBadge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+
+    .review {
+      background: var(--warnSoft);
+      color: var(--warn);
+    }
+
+    .good {
+      background: var(--successSoft);
+      color: var(--success);
+    }
+
+    .bad {
+      background: var(--dangerSoft);
+      color: var(--danger);
+    }
+
+    .summaryGrid {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 20px;
+    }
+
+    .metricGrid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    .formulaList {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+    }
+
+    .formulaList li + li {
+      margin-top: 8px;
+    }
+
+    .note {
+      margin-top: 16px;
+      padding: 14px 16px;
+      border-left: 4px solid var(--primary);
+      background: #f1f8f8;
+      border-radius: 10px;
+      color: #35545a;
+    }
+
+    .saveState {
+      margin-top: 12px;
+      font-size: 0.92rem;
+      color: var(--muted);
+    }
+    .small {
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    @media (max-width: 1100px) {
+      .topGrid,
+      .summaryGrid,
+      .metricGrid,
+      .controlGrid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media print {
+      body {
+        background: #fff;
+      }
+
+      .page {
+        max-width: 100%;
+        padding: 0;
+      }
+
+      .card {
+        box-shadow: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="card hero">
+      <h1>Text-to-SQL Evaluation Table</h1>
+      <p>
+        This report has automatic metric calculation so it can be used to evaluate SQL
+        correctness, answer quality, and response performance directly in the
+        browser.
+      </p>
+	  <img src="chatbot.png" style="max-width: 100%"/>
+      <div class="badgeRow">
+        <span class="badge">text-to-sql</span>
+        <span class="badge">bi insights partner</span>
+        <span class="badge">nlp for bi</span>
+        <span class="badge">evaluation report</span>
+      </div>
+      <div class="actionRow">
+        <button class="actionButton primary" id="saveDraftBtn">
+          Save draft now
+        </button>
+        <button class="actionButton" id="exportBtn">
+          Export JSON backup
+        </button>
+        <label class="fileLabel" for="importFile">
+          Import JSON backup
+        </label>
+        <input class="fileInput" id="importFile" type="file"
+          accept="application/json">
+        <button class="actionButton warn" id="resetBtn">
+          Clear saved draft
+        </button>
+      </div>
+      <div class="saveState" id="saveState">
+        Draft status: not saved yet.
+      </div>
+      <div class="note">
+        Important: browser-based persistence saves the draft for the same
+        browser and same file/page context. If you need a portable permanent
+        copy, use Export JSON backup.
+      </div>
+    </section>
+
+    <section class="topGrid">
+      <article class="card panel">
+        <h2>Live summary</h2>
+        <p>
+          Update the test questions and response times in the table below. The
+          summary cards recalculate automatically.
+        </p>
+        <div class="metricGrid">
+          <div class="metricCard">
+            <div class="metricLabel">Total tests</div>
+            <div class="metricValue" id="totalTests">0</div>
+            <div class="metricHint">All rows currently in the table</div>
+          </div>
+          <div class="metricCard">
+            <div class="metricLabel">Passed tests</div>
+            <div class="metricValue" id="passedTests">0</div>
+            <div class="metricHint">Rows marked Pass</div>
+          </div>
+          <div class="metricCard">
+            <div class="metricLabel">Need review</div>
+            <div class="metricValue" id="reviewTests">0</div>
+            <div class="metricHint">Rows marked Review</div>
+          </div>
+          <div class="metricCard">
+            <div class="metricLabel">Failed tests</div>
+            <div class="metricValue" id="failedTests">0</div>
+            <div class="metricHint">Rows marked Fail</div>
+          </div>
+          <div class="metricCard">
+            <div class="metricLabel">Pass rate</div>
+            <div class="metricValue" id="passRate">0%</div>
+            <div class="metricHint">Passed tests / total tests</div>
+          </div>
+          <div class="metricCard">
+            <div class="metricLabel">Avg. response time</div>
+            <div class="metricValue" id="avgResponseTime">0.00 s</div>
+            <div class="metricHint">Average of filled response-time cells</div>
+          </div>
+        </div>
+      </article>
+
+      <aside class="card panel">
+        <h2>How to use</h2>
+        <ol class="formulaList">
+          <li>Run each question through the application.</li>
+          <li>Paste the SQL, result notes into the row.</li>
+          <li>Pick values for SQL validity, result correctness, answer correctness, and pass/fail.</li>
+          <li>Enter response time in seconds.</li>
+          <li>Read the live metrics at the top and bottom of the page.</li>
+        </ol>
+        <div class="note">
+          This report is used as evidence for testing, debugging, validation, and bug-fix
+          reporting in the project documentation.
+        </div>
+      </aside>
+    </section>
+
+    <section class="card tableCard">
+      <div class="toolbar">
+        <div>
+          <h2>Interactive testing matrix</h2>
+        </div>
+        <span class="statusBadge review">Auto-calculate enabled</span>
+      </div>
+
+      <div class="tableWrap">
+        <table id="evaluationTable">
+          <colgroup>
+            <col style="width: 80px;">
+            <col style="width: 210px;">
+            <col style="width: 210px;">
+            <col style="width: 190px;">
+            <col style="width: 245px;">
+            <col style="width: 200px;">
+            <col style="width: 140px;">
+            <col style="width: 140px;">
+            <col style="width: 150px;">
+            <col style="width: 120px;">
+            <col style="width: 210px;">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Test ID</th>
+              <th>Question</th>
+              <th>Expected SQL / logic</th>
+              <th>Expected result</th>
+              <th>Generated SQL</th>
+              <th>Returned data / answer check</th>
+              <th>SQL valid?</th>
+              <th>Result correct?</th>
+              <th>Answer correct?</th>
+              <th>Resp. time (s)</th>
+              <th>Pass / Fail / Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="idCell">T01</td>
+              <td><textarea class="textareaBox">How many customers are there?</textarea></td>
+              <td><textarea class="textareaBox">COUNT(*) from customers.</textarea></td>
+              <td><textarea class="textareaBox">One numeric total matching the table count.</textarea></td>
+              <td><textarea class="textareaBox sqlBox"></textarea></td>
+ 
+              <td><textarea class="textareaBox"></textarea></td>
+              <td>
+                <select class="selectBox sql-valid">
+                  <option value="">Select</option>
+                  <option value="yes">Yes</option>
+                  <option value="partial">Partial</option>
+                  <option value="no">No</option>
+                </select>
+              </td>
+              <td>
+                <select class="selectBox result-correct">
+                  <option value="">Select</option>
+                  <option value="yes">Yes</option>
+                  <option value="partial">Partial</option>
+                  <option value="no">No</option>
+                </select>
+              </td>
+              <td>
+                <select class="selectBox answer-correct">
+                  <option value="">Select</option>
+                  <option value="yes">Yes</option>
+                  <option value="partial">Partial</option>
+                  <option value="no">No</option>
+                </select>
+              </td>
+              <td><input class="inputBox response-time" type="number" min="0" step="0.01" placeholder="e.g. 1.45"></td>
+              <td>
+                <div class="controlGrid">
+                  <div>
+                    <div class="controlLabel">Status</div>
+                    <select class="selectBox pass-status">
+                      <option value="">Select</option>
+                      <option value="pass">Pass</option>
+                      <option value="review">Review</option>
+                      <option value="fail">Fail</option>
+                    </select>
+                  </div>
+                  <div>
+                    <div class="controlLabel">Edge case?</div>
+                    <select class="selectBox edge-case">
+                      <option value="no">No</option>
+                      <option value="yes">Yes</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="helpText small">Notes</div>
+                <textarea class="textareaBox" style="min-height: 84px;"></textarea>
+              </td>
+            </tr>
+            <tr>
+              <td class="idCell">T02</td>
+              <td><textarea class="textareaBox">What is total sales for 2025?</textarea></td>
+              <td><textarea class="textareaBox">SUM(amount) with a year filter for 2025.</textarea></td>
+              <td><textarea class="textareaBox">One total sales value for 2025.</textarea></td>
+              <td><textarea class="textareaBox sqlBox"></textarea></td>
+ 
+              <td><textarea class="textareaBox"></textarea></td>
+              <td><select class="selectBox sql-valid"><option value="">Select</option><option value="yes">Yes</option><option value="partial">Partial</option><option value="no">No</option></select></td>
+              <td><select class="selectBox result-correct"><option value="">Select</option><option value="yes">Yes</option><option value="partial">Partial</option><option value="no">No</option></select></td>
+              <td><select class="selectBox answer-correct"><option value="">Select</option><option value="yes">Yes</option><option value="partial">Partial</option><option value="no">No</option></select></td>
+              <td><input class="inputBox response-time" type="number" min="0" step="0.01"></td>
+              <td>
+                <div class="controlGrid">
+                  <div><div class="controlLabel">Status</div><select class="selectBox pass-status"><option value="">Select</option><option value="pass">Pass</option><option value="review">Review</option><option value="fail">Fail</option></select></div>
+                  <div><div class="controlLabel">Edge case?</div><select class="selectBox edge-case"><option value="no">No</option><option value="yes">Yes</option></select></div>
+                </div>
+                <div class="helpText small">Notes</div>
+                <textarea class="textareaBox" style="min-height: 84px;"></textarea>
+              </td>
+            </tr>
+            <tr>
+              <td class="idCell">T03</td>
+              <td><textarea class="textareaBox">Show the top 5 products by revenue.</textarea></td>
+              <td><textarea class="textareaBox">GROUP BY product, SUM(revenue), ORDER BY revenue DESC, LIMIT 5.</textarea></td>
+              <td><textarea class="textareaBox">Five rows sorted by revenue descending.</textarea></td>
+              <td><textarea class="textareaBox sqlBox"></textarea></td>
+ 
+              <td><textarea class="textareaBox"></textarea></td>
+              <td><select class="selectBox sql-valid"><option value="">Select</option><option value="yes">Yes</option><option value="partial">Partial</option><option value="no">No</option></select></td>
+              <td><select class="selectBox result-correct"><option value="">Select</option><option value="yes">Yes</option><option value="partial">Partial</option><option value="no">No</option></select></td>
+              <td><select class="selectBox answer-correct"><option value="">Select</option><option value="yes">Yes</option><option value="partial">Partial</option><option value="no">No</option></select></td>
+              <td><input class="inputBox response-time" type="number" min="0" step="0.01"></td>
+              <td>
+                <div class="controlGrid">
+                  <div><div class="controlLabel">Status</div><select class="selectBox pass-status"><option value="">Select</option><option value="pass">Pass</option><option value="review">Review</option><option value="fail">Fail</option></select></div>
+                  <div><div class="controlLabel">Edge case?</div><select class="selectBox edge-case"><option value="no">No</option><option value="yes">Yes</option></select></div>
+                </div>
+                <div class="helpText small">Notes</div>
+                <textarea class="textareaBox" style="min-height: 84px;"></textarea>
+              </td>
+            </tr>
+            <tr>
+              <td class="idCell">T04</td>
+              <td><textarea class="textareaBox">What is the average order value by region?</textarea></td>
+              <td><textarea class="textareaBox">AVG(order_value) grouped by region.</textarea></td>
+              <td><textarea class="textareaBox">One row per region with average order value.</textarea></td>
+              <td><textarea class="textareaBox sqlBox"></textarea></td>
+ 
+              <td><textarea class="textareaBox"></textarea></td>
+              <td><select class="selectBox sql-valid"><option value="">Select</option><option value="yes">Yes</option><option value="partial">Partial</option><option value="no">No</option></select></td>
+              <td><select class="selectBox result-correct"><option value="">Select</option><option value="yes">Yes</option><option value="partial">Partial</option><option value="no">No</option></select></td>
+              <td><select class="selectBox answer-correct"><option value="">Select</option><option value="yes">Yes</option><option value="partial">Partial</option><option value="no">No</option></select></td>
+              <td><input class="inputBox response-time" type="number" min="0" step="0.01"></td>
+              <td>
+                <div class="controlGrid">
+                  <div><div class="controlLabel">Status</div><select class="selectBox pass-status"><option value="">Select</option><option value="pass">Pass</option><option value="review">Review</option><option value="fail">Fail</option></select></div>
+                  <div><div class="controlLabel">Edge case?</div><select class="selectBox edge-case"><option value="no">No</option><option value="yes">Yes</option></select></div>
+                </div>
+                <div class="helpText small">Notes</div>
+                <textarea class="textareaBox" style="min-height: 84px;"></textarea>
+              </td>
+            </tr>
+            <tr>
+              <td class="idCell">T05</td>
+              <td><textarea class="textareaBox">Find orders with a status that does not exist.</textarea></td>
+              <td><textarea class="textareaBox">Filter on a non-existing status and return zero rows.</textarea></td>
+              <td><textarea class="textareaBox">Empty result set with a clear explanation.</textarea></td>
+              <td><textarea class="textareaBox sqlBox"></textarea></td>
+ 
+              <td><textarea class="textareaBox"></textarea></td>
+              <td><select class="selectBox sql-valid"><option value="">Select</option><option value="yes">Yes</option><option value="partial">Partial</option><option value="no">No</option></select></td>
+              <td><select class="selectBox result-correct"><option value="">Select</option><option value="yes">Yes</option><option value="partial">Partial</option><option value="no">No</option></select></td>
+              <td><select class="selectBox answer-correct"><option value="">Select</option><option value="yes">Yes</option><option value="partial">Partial</option><option value="no">No</option></select></td>
+              <td><input class="inputBox response-time" type="number" min="0" step="0.01"></td>
+              <td>
+                <div class="controlGrid">
+                  <div><div class="controlLabel">Status</div><select class="selectBox pass-status"><option value="">Select</option><option value="pass">Pass</option><option value="review">Review</option><option value="fail">Fail</option></select></div>
+                  <div><div class="controlLabel">Edge case?</div><select class="selectBox edge-case"><option value="no">No</option><option value="yes">Yes</option></select></div>
+                </div>
+                <div class="helpText small">Notes</div>
+                <textarea class="textareaBox" style="min-height: 84px;"></textarea>
+              </td>
+            </tr>
+            <tr>
+              <td class="idCell">T06</td>
+              <td><textarea class="textareaBox">List customers with orders above 1000.</textarea></td>
+              <td><textarea class="textareaBox">JOIN customers and orders, filter amount greater than 1000.</textarea></td>
+              <td><textarea class="textareaBox">Matching customers only, based on the join and filter.</textarea></td>
+              <td><textarea class="textareaBox sqlBox"></textarea></td>
+ 
+              <td><textarea class="textareaBox"></textarea></td>
+              <td><select class="selectBox sql-valid"><option value="">Select</option><option value="yes">Yes</option><option value="partial">Partial</option><option value="no">No</option></select></td>
+              <td><select class="selectBox result-correct"><option value="">Select</option><option value="yes">Yes</option><option value="partial">Partial</option><option value="no">No</option></select></td>
+              <td><select class="selectBox answer-correct"><option value="">Select</option><option value="yes">Yes</option><option value="partial">Partial</option><option value="no">No</option></select></td>
+              <td><input class="inputBox response-time" type="number" min="0" step="0.01"></td>
+              <td>
+                <div class="controlGrid">
+                  <div><div class="controlLabel">Status</div><select class="selectBox pass-status"><option value="">Select</option><option value="pass">Pass</option><option value="review">Review</option><option value="fail">Fail</option></select></div>
+                  <div><div class="controlLabel">Edge case?</div><select class="selectBox edge-case"><option value="no">No</option><option value="yes">Yes</option></select></div>
+                </div>
+                <div class="helpText small">Notes</div>
+                <textarea class="textareaBox" style="min-height: 84px;"></textarea>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="summaryGrid">
+      <article class="card panel">
+        <h2>Calculated evaluation metrics</h2>
+        <p>
+          These values summarize testing quality.
+        </p>
+        <div class="metricGrid">
+          <div class="metricCard">
+            <div class="metricLabel">SQL validity</div>
+            <div class="metricValue" id="sqlValidity">0%</div>
+            <div class="metricHint">Rows with SQL valid = Yes</div>
+          </div>
+          <div class="metricCard">
+            <div class="metricLabel">Result accuracy</div>
+            <div class="metricValue" id="resultAccuracy">0%</div>
+            <div class="metricHint">Rows with result correct = Yes</div>
+          </div>
+          <div class="metricCard">
+            <div class="metricLabel">Answer accuracy</div>
+            <div class="metricValue" id="answerAccuracy">0%</div>
+            <div class="metricHint">Rows with answer correct = Yes</div>
+          </div>
+          <div class="metricCard">
+            <div class="metricLabel">Edge-case success</div>
+            <div class="metricValue" id="edgeSuccess">0%</div>
+            <div class="metricHint">Edge-case rows marked Pass</div>
+          </div>
+          <div class="metricCard">
+            <div class="metricLabel">Completed rows</div>
+            <div class="metricValue" id="completedRows">0</div>
+            <div class="metricHint">Rows with a selected Pass/Review/Fail</div>
+          </div>
+          <div class="metricCard">
+            <div class="metricLabel">Quality signal</div>
+            <div class="metricValue" id="qualitySignal">Needs data</div>
+            <div class="metricHint">Based on pass rate and accuracy values</div>
+          </div>
+        </div>
+        <div class="note">
+          These metrics are for testing and validation section,
+          along with screenshots, bug notes, and examples of corrected queries.
+        </div>
+      </article>
+
+      <aside class="card panel">
+        <h2>Metric formulas</h2>
+        <ol class="formulaList">
+          <li>Pass rate = Passed tests / Total tests × 100</li>
+          <li>SQL validity = Valid SQL queries / Total tests × 100</li>
+          <li>Result accuracy = Correct result sets / Total tests × 100</li>
+          <li>Answer accuracy = Correct answers / Total tests × 100</li>
+          <li>Edge-case success = Passed edge cases / Total edge cases × 100</li>
+          <li>Average response time = Total response seconds / Timed tests</li>
+        </ol>
+        <div class="note">
+          This is a final evaluation, there were tested of syntax errors,
+          incorrect joins, wrong alias, and they are fixed during the testing and developing process.
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    const storageKey = 'sqlEvaluationTablePersistentV1';
+    const table = document.getElementById('evaluationTable');
+    const saveState = document.getElementById('saveState');
+    const saveDraftBtn = document.getElementById('saveDraftBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    const importFile = document.getElementById('importFile');
+    const resetBtn = document.getElementById('resetBtn');
+
+    function percent(part, whole) {
+      if (!whole) {
+        return '0%';
+      }
+      return ((part / whole) * 100).toFixed(1) + '%';
+    }
+
+    function average(values) {
+      if (!values.length) {
+        return 0;
+      }
+      const total = values.reduce((sum, value) => sum + value, 0);
+      return total / values.length;
+    }
+
+    function getQualitySignal(passRate, sqlRate, resultRate, answerRate) {
+      if (passRate === 0 && sqlRate === 0 && resultRate === 0 &&
+          answerRate === 0) {
+        return 'Needs data';
+      }
+
+      if (passRate >= 90 && sqlRate >= 90 && resultRate >= 90 &&
+          answerRate >= 90) {
+        return 'Excellent';
+      }
+
+      if (passRate >= 75 && sqlRate >= 75 && resultRate >= 75 &&
+          answerRate >= 75) {
+        return 'Good';
+      }
+
+      if (passRate >= 60 && sqlRate >= 60 && resultRate >= 60 &&
+          answerRate >= 60) {
+        return 'Satisfactory';
+      }
+
+      return 'Needs improvement';
+    }
+
+    function getRows() {
+      return Array.from(table.querySelectorAll('tbody tr'));
+    }
+
+    function collectRowData(row) {
+      const fields = row.querySelectorAll('textarea, select, input');
+      return Array.from(fields).map((field) => field.value);
+    }
+
+    function collectAllData() {
+      return {
+        savedAt: new Date().toISOString(),
+        rows: getRows().map(collectRowData)
+      };
+    }
+
+    function applyRowData(row, values) {
+      const fields = row.querySelectorAll('textarea, select, input');
+      Array.from(fields).forEach((field, index) => {
+        field.value = values[index] || '';
+      });
+    }
+
+    function applyAllData(data) {
+      if (!data || !Array.isArray(data.rows)) {
+        return;
+      }
+      const rows = getRows();
+      rows.forEach((row, index) => {
+        if (data.rows[index]) {
+          applyRowData(row, data.rows[index]);
+        }
+      });
+      updateMetrics();
+    }
+
+    function saveDraft(showMessage = true) {
+      try {
+        const data = collectAllData();
+        localStorage.setItem(storageKey, JSON.stringify(data));
+        if (showMessage) {
+          saveState.textContent = 'Draft saved locally at ' +
+            new Date().toLocaleString();
+        }
+      } catch (error) {
+        saveState.textContent = 'Local draft save is not available in this ' +
+          'browser context. Use Export JSON backup instead.';
+      }
+    }
+
+    function loadDraft() {
+      try {
+        const raw = localStorage.getItem(storageKey);
+        if (!raw) {
+          saveState.textContent = 'Draft status: no local draft found yet.';
+          return;
+        }
+        const data = JSON.parse(raw);
+        applyAllData(data);
+        saveState.textContent = 'Draft restored from local browser storage.';
+      } catch (error) {
+        saveState.textContent = 'Could not restore local draft. You can still ' +
+          'use Import JSON backup.';
+      }
+    }
+
+    function exportJson() {
+      const data = collectAllData();
+      const blob = new Blob([
+        JSON.stringify(data, null, 2)
+      ], { type: 'application/json' });
+      const link = document.createElement('a');
+      const fileName = 'sql-evaluation-table-backup.json';
+      link.href = URL.createObjectURL(blob);
+      link.download = fileName;
+      link.click();
+      URL.revokeObjectURL(link.href);
+      saveState.textContent = 'JSON backup exported successfully.';
+    }
+
+    function importJson(file) {
+      if (!file) {
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        try {
+          const data = JSON.parse(event.target.result);
+          applyAllData(data);
+          saveDraft(false);
+          saveState.textContent = 'JSON backup imported and saved locally.';
+        } catch (error) {
+          saveState.textContent = 'Import failed. Please select a valid JSON ' +
+            'backup file.';
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function clearDraft() {
+      const confirmed = window.confirm(
+        'Clear the saved local draft and reset all current field values?'
+      );
+      if (!confirmed) {
+        return;
+      }
+      getRows().forEach((row) => {
+        row.querySelectorAll('textarea, select, input').forEach((field) => {
+          if (field.tagName === 'SELECT') {
+            field.selectedIndex = 0;
+          } else {
+            field.value = '';
+          }
+        });
+        const edgeCase = row.querySelector('.edge-case');
+        if (edgeCase) {
+          edgeCase.value = 'no';
+        }
+      });
+      try {
+        localStorage.removeItem(storageKey);
+      } catch (error) {
+      }
+      updateMetrics();
+      saveState.textContent = 'Saved local draft cleared.';
+    }
+
+    function updateMetrics() {
+      const rows = getRows();
+      const totalTests = rows.length;
+      let passedTests = 0;
+      let reviewTests = 0;
+      let failedTests = 0;
+      let completedRows = 0;
+      let sqlValidYes = 0;
+      let resultCorrectYes = 0;
+      let answerCorrectYes = 0;
+      let edgeTotal = 0;
+      let edgePassed = 0;
+      const responseTimes = [];
+
+      rows.forEach((row) => {
+        const passStatus = row.querySelector('.pass-status').value;
+        const sqlValid = row.querySelector('.sql-valid').value;
+        const resultCorrect = row.querySelector('.result-correct').value;
+        const answerCorrect = row.querySelector('.answer-correct').value;
+        const edgeCase = row.querySelector('.edge-case').value;
+        const responseTime = parseFloat(
+          row.querySelector('.response-time').value
+        );
+
+        if (passStatus) {
+          completedRows += 1;
+        }
+        if (passStatus === 'pass') {
+          passedTests += 1;
+        }
+        if (passStatus === 'review') {
+          reviewTests += 1;
+        }
+        if (passStatus === 'fail') {
+          failedTests += 1;
+        }
+        if (sqlValid === 'yes') {
+          sqlValidYes += 1;
+        }
+        if (resultCorrect === 'yes') {
+          resultCorrectYes += 1;
+        }
+        if (answerCorrect === 'yes') {
+          answerCorrectYes += 1;
+        }
+        if (edgeCase === 'yes') {
+          edgeTotal += 1;
+          if (passStatus === 'pass') {
+            edgePassed += 1;
+          }
+        }
+        if (!Number.isNaN(responseTime) && responseTime >= 0) {
+          responseTimes.push(responseTime);
+        }
+      });
+
+      const passRateValue = totalTests ? (passedTests / totalTests) * 100 : 0;
+      const sqlValidityValue = totalTests ?
+        (sqlValidYes / totalTests) * 100 : 0;
+      const resultAccuracyValue = totalTests ?
+        (resultCorrectYes / totalTests) * 100 : 0;
+      const answerAccuracyValue = totalTests ?
+        (answerCorrectYes / totalTests) * 100 : 0;
+      const avgTime = average(responseTimes);
+
+      document.getElementById('totalTests').textContent = totalTests;
+      document.getElementById('passedTests').textContent = passedTests;
+      document.getElementById('reviewTests').textContent = reviewTests;
+      document.getElementById('failedTests').textContent = failedTests;
+      document.getElementById('completedRows').textContent = completedRows;
+      document.getElementById('passRate').textContent =
+        percent(passedTests, totalTests);
+      document.getElementById('avgResponseTime').textContent =
+        avgTime.toFixed(2) + ' s';
+      document.getElementById('sqlValidity').textContent =
+        percent(sqlValidYes, totalTests);
+      document.getElementById('resultAccuracy').textContent =
+        percent(resultCorrectYes, totalTests);
+      document.getElementById('answerAccuracy').textContent =
+        percent(answerCorrectYes, totalTests);
+      document.getElementById('edgeSuccess').textContent =
+        percent(edgePassed, edgeTotal);
+      document.getElementById('qualitySignal').textContent = getQualitySignal(
+        passRateValue,
+        sqlValidityValue,
+        resultAccuracyValue,
+        answerAccuracyValue
+      );
+    }
+
+    let saveTimer = null;
+
+    function queueSave() {
+      updateMetrics();
+      if (saveTimer) {
+        clearTimeout(saveTimer);
+      }
+      saveTimer = setTimeout(() => {
+        saveDraft(false);
+        saveState.textContent = 'Draft auto-saved locally at ' +
+          new Date().toLocaleString();
+      }, 500);
+    }
+
+    table.querySelectorAll('textarea, select, input').forEach((field) => {
+      field.addEventListener('input', queueSave);
+      field.addEventListener('change', queueSave);
+    });
+
+    saveDraftBtn.addEventListener('click', () => saveDraft(true));
+    exportBtn.addEventListener('click', exportJson);
+    importFile.addEventListener('change', (event) => {
+      importJson(event.target.files[0]);
+      event.target.value = '';
+    });
+    resetBtn.addEventListener('click', clearDraft);
+
+    updateMetrics();
+    loadDraft();
+  </script>
+</body>
+</html>
